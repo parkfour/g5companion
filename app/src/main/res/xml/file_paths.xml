@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="shared_pov" path="shared_pov/" />
+    <cache-path name="pov_cache" path="pov_cache/" />
+    <cache-path name="cache_root" path="." />
+    <files-path name="pov" path="pov/" />
+</paths>

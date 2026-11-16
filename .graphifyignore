@@ -1,0 +1,6 @@
+ref/
+build/
+app/build/
+.gradle/
+vendor/
+firmware/

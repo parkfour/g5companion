@@ -1,0 +1,11 @@
+build/
+.gradle/
+local.properties
+ref/
+*.iml
+.idea/
+graphify-out/
+firmware/
+.kotlin/
+vendor/
+.aider*

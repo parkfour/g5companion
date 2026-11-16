@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- The glasses' media server is plain HTTP on a Wi-Fi Direct link (192.168.49.x, address assigned at
+         runtime), and network-security-config cannot express IP subnets. Gemini traffic is HTTPS regardless. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

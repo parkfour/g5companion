@@ -41,16 +41,67 @@ jobs:
       - name: Unit tests and debug APK
         run: ./gradlew testDebugUnitTest assembleDebug
 
-      # Gitea only (debug-signed APK as a downloadable run artifact). Must be
-      # v3: v4 refuses to run on any server other than github.com, and Gitea
-      # implements the v3 artifact protocol.
+  # Gitea only: a downloadable debug-APK run artifact for every push. Kept in
+  # its own job (not verify) so GitHub never references actions/upload-artifact
+  # @v3, which GitHub fails runs for; Gitea needs v3 (it doesn't implement v4).
+  debug-apk:
+    needs: verify
+    if: github.server_url != 'https://github.com'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+
       - name: Keep the debug APK as a run artifact
-        if: github.server_url != 'https://github.com'
         uses: actions/upload-artifact@v3
         with:
           name: g5-companion-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+  # GitHub only: each v* tag builds the (R8-minified) release APK and attaches
+  # it to a GitHub Release of that tag. The APK is signed with the debug key
+  # (see app/build.gradle.kts), so set a real signingConfig before wider
+  # distribution. Tags reach GitHub through the mirror's publish job.
+  release-apk:
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/v') && github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          apk=g5-companion-${GITHUB_REF_NAME}.apk
+          cp "$(find app/build/outputs/apk/release -name '*.apk' | head -1)" "$apk"
+          gh release create "$GITHUB_REF_NAME" "$apk" --title "$GITHUB_REF_NAME" --generate-notes
 
   # Copies main, minus the paths in .gitdontforward, to main on the public
   # GitHub mirror (scripts/publish-mirror.sh), and version tags along with

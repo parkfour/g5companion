@@ -192,7 +192,7 @@ class GlassesCompanionService : LifecycleService() {
         private const val ACTION_STOP = "stop"
         const val ACTION_TRIGGER_AI = "dev.g5.companion.TRIGGER_AI"
         const val ACTION_ROUTE_COMMAND = "dev.g5.companion.ROUTE_COMMAND"
-        private const val WAKE_LOCK_TIMEOUT_MS = 15_000L
+        private const val WAKE_LOCK_TIMEOUT_MS = 45_000L // covers a spoken yes/no confirmation (HandsFree)
 
         fun start(ctx: Context) = ctx.startForegroundService(Intent(ctx, GlassesCompanionService::class.java))
 

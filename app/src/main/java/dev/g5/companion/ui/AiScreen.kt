@@ -48,6 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import dev.g5.companion.IntentRuleStore
 import dev.g5.companion.MusicAppManager
 import dev.g5.companion.MusicAppOption
+import dev.g5.companion.NotificationReader
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -116,6 +119,17 @@ fun AiScreen(modifier: Modifier) {
     var autoDelete by remember { mutableStateOf(prefs.autoDelete) }
     var videoLoop by remember { mutableStateOf(prefs.videoLoop) }
     var wakeWord by remember { mutableStateOf(prefs.wakeWordEnabled) }
+    var readNotifs by remember { mutableStateOf(prefs.readNotifications) }
+    var announceCalls by remember { mutableStateOf(prefs.announceCalls) }
+    var voiceCallsTexts by remember { mutableStateOf(prefs.voiceCallsTexts) }
+    val callPerms = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { !it }) { voiceCallsTexts = false; prefs.voiceCallsTexts = false }
+    }
+    fun ensureNotificationAccess() {
+        if (!NotificationReader.hasAccess(ctx)) {
+            ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+    }
     var question by remember { mutableStateOf("") }
     var withPhoto by remember { mutableStateOf(true) }
 
@@ -437,6 +451,36 @@ fun AiScreen(modifier: Modifier) {
                     Text("On-device \"hey …\" trigger. Turn off if it fires on the TV or other voices; the AI button still works", style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(wakeWord, { wakeWord = it; prefs.wakeWordEnabled = it; Glasses.refreshVoiceStatus() })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Read notifications aloud")
+                    Text("Speaks new alerts through the glasses while they're connected. Silent ones and Do Not Disturb are respected", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(readNotifs, {
+                    readNotifs = it; prefs.readNotifications = it
+                    if (it) ensureNotificationAccess()
+                })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Announce incoming calls")
+                    Text("Says \"Call from …\" through the glasses when the phone rings. Uses notification access", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(announceCalls, {
+                    announceCalls = it; prefs.announceCalls = it
+                    if (it) ensureNotificationAccess()
+                })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Voice calls and texts")
+                    Text("\"Call Alex\", \"text Alex saying running late\". Texts are read back and only sent after you say yes. Needs contacts, phone and SMS access", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(voiceCallsTexts, {
+                    voiceCallsTexts = it; prefs.voiceCallsTexts = it
+                    if (it) callPerms.launch(CALL_TEXT_PERMISSIONS)
+                })
             }
             FirmwareRow(glasses)
             Text("Theme", modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
@@ -820,3 +864,9 @@ private fun TurnCard(t: Turn) {
         }
     }
 }
+
+private val CALL_TEXT_PERMISSIONS = arrayOf(
+    android.Manifest.permission.READ_CONTACTS,
+    android.Manifest.permission.CALL_PHONE,
+    android.Manifest.permission.SEND_SMS,
+)

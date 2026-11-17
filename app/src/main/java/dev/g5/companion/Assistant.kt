@@ -15,6 +15,7 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -33,6 +34,7 @@ import java.io.File
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.math.sqrt
@@ -125,6 +127,7 @@ object Assistant {
     private const val TAG = "Assistant"
     private const val MAX_HISTORY = 100
     private const val LOOK_QUESTION = "What am I looking at?"
+    private const val SAY_WAIT_MAX_MS = 20_000L
 
     private val _history = MutableStateFlow<List<Turn>>(emptyList())
     val history = _history.asStateFlow()
@@ -147,8 +150,38 @@ object Assistant {
                     AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build(),
                 )
+                setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(id: String?) = Unit
+                    override fun onDone(id: String?) { id?.let { spoken.remove(it)?.invoke() } }
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(id: String?) { id?.let { spoken.remove(it)?.invoke() } }
+                })
             }
         }
+    }
+
+    private val spoken = ConcurrentHashMap<String, () -> Unit>()
+
+    /** Speaks [text] and suspends until it has finished (so the mic doesn't hear it). */
+    suspend fun sayAndWait(text: String) {
+        withTimeoutOrNull(SAY_WAIT_MAX_MS) {
+            suspendCancellableCoroutine { c ->
+                val id = "g5-${System.nanoTime()}"
+                spoken[id] = { if (c.isActive) c.resume(Unit) }
+                c.invokeOnCancellation { spoken.remove(id) }
+                if (tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) {
+                    spoken.remove(id)
+                    c.resume(Unit)
+                }
+            }
+        }
+    }
+
+    /** Speaks [prompt], records the answer from the glasses mic, and returns the transcript. */
+    suspend fun askAndListen(prompt: String): String? {
+        sayAndWait(prompt)
+        val audio = withContext(Dispatchers.IO) { listen() } ?: return null
+        return Speech.transcribe(app, audio).also { _status.value = null }
     }
 
     /** Physical AI button (notify 0x03) or UI test trigger. Routes via [GlassesCompanionService]. */
@@ -200,6 +233,7 @@ object Assistant {
 
         // Fast-path: detect direct action verbs on-device (zero latency, offline)
         val textPrompt = typed ?: transcript
+        if (textPrompt != null && HandsFree.handle(app, textPrompt)) return
         if (textPrompt != null) {
             val directAction = ActionDispatcher.parse(textPrompt, prefs.customVerbs())
             if (directAction != null) {
@@ -281,9 +315,10 @@ object Assistant {
         return if (name.isNullOrBlank()) coords else "$name ($coords)"
     }
 
-    fun say(text: String) {
-        _status.value = null
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "g5-${System.nanoTime()}")
+    /** [flush] = interrupt whatever is playing; false queues behind it (notifications). */
+    fun say(text: String, flush: Boolean = true) {
+        if (flush) _status.value = null
+        tts?.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "g5-${System.nanoTime()}")
     }
 
     fun addTurn(question: String, answer: String, image: ByteArray? = null) {

@@ -41,9 +41,33 @@ Kotlin + Jetpack Compose · minSdk 31 · target/compile SDK 36 · built and test
 - **Gemini Live mode** (Gemini only): a continuous voice conversation with a photo from the glasses every few seconds.
 - Typed questions, with or without a photo from the glasses.
 - A shared system prompt, and history (stored on the phone only).
+
+**Hands-free (phone stays in your pocket)**
+- **Read notifications aloud** through the glasses while they're connected: "Messages: Alex. Running late".
+  Silent and low-priority notifications, ongoing ones (music, navigation) and anything Do Not Disturb would block are
+  skipped. Needs Android notification access, which the switch opens for you.
+- **Announce incoming calls** ("Call from Alex"), off by default. Uses the same notification access; answering works
+  from the glasses as a normal Bluetooth headset.
+- **Voice commands** (AI button or wake word), handled on the phone before anything is sent to an AI service:
+
+  | Say | What happens |
+  |---|---|
+  | "Reply on my way" | Replies to the last message, after reading it back and hearing "yes" |
+  | "Call Alex Smith" | Looks up the contact and dials |
+  | "Text Alex saying running late" | Reads it back and sends after "yes" |
+  | "Set a timer for 10 minutes" | Clock app timer |
+  | "Remind me in 20 minutes to call Mom" / "Remind me at 5 pm to call Mom" | Labelled timer / alarm |
+  | "Walk me to the train station" | Google Maps walking navigation ("navigate to" stays driving) |
+  | "What did I miss?" | Reads up to 5 unread notifications, newest first |
+
+  Calling and texting are behind **Voice calls and texts** (off by default), which asks for contacts, phone and SMS
+  permissions. Saying "no", "cancel" or "wait" at a confirmation cancels it.
+- The voice used is the phone's system text-to-speech (Settings → Text-to-speech output), except in Gemini Live.
 - Other settings:
   - Delete from glasses after sync (off by default).
   - Continuous video loop.
+  - Hands-free wake word on/off.
+  - Read notifications aloud, announce incoming calls, voice calls and texts.
   - Firmware version and **Check for update**.
   - Theme (System / Light / Dark).
   - **Forget glasses**.
@@ -54,6 +78,7 @@ Kotlin + Jetpack Compose · minSdk 31 · target/compile SDK 36 · built and test
 |---|---|
 | Photos, videos, recordings | Glasses → phone over Wi-Fi Direct. Never uploaded. |
 | AI questions | Only to the service you selected, with your own API key. Includes the photo, the question (audio for Gemini, a transcript otherwise), time, and approximate location if granted. |
+| Notifications, contacts | Read on the phone only, to speak them or find who to call/text. Never sent to an AI service. |
 | API keys | Stored on the device, AES-GCM encrypted with a non-exportable Android Keystore key. |
 | Firmware check | Only when you tap the button: firmware version + model code (`S3DPVR`) to DPVR's update server. No phone, MAC or account identifiers. |
 
@@ -91,7 +116,9 @@ distributing it.
    listed even if they aren't advertising.
 3. **AI & Settings**: pick a service, open its settings, paste an API key and tap **Save**.
 4. Press the AI button on the glasses or say the wake word, then ask your question.
-5. **Glasses → Sync All Media** to pull media. Phone Wi-Fi must be on and the hotspot off. Accept the Wi-Fi Direct
+5. Optional, for leaving the phone in your pocket: in **Other settings** turn on **Read notifications aloud**
+   (and allow notification access), **Announce incoming calls**, and **Voice calls and texts**.
+6. **Glasses → Sync All Media** to pull media. Phone Wi-Fi must be on and the hotspot off. Accept the Wi-Fi Direct
    prompt if Android shows one.
 
 ## Code map
@@ -102,6 +129,8 @@ distributing it.
 | `Glasses.kt` | Native GATT client: scan, connect, reconnect, commands, status, events |
 | `GlassesService.kt` | Foreground service; routes the AI button to the assistant |
 | `MediaSync.kt` | Wi-Fi Direct + HTTP media download, verification, MediaStore, optional delete from glasses |
+| `NotificationReader.kt` | Notification listener: reads alerts aloud, announces calls, keeps the last replyable message |
+| `HandsFree.kt` | On-phone voice commands: reply, call, text, timers, reminders, walking directions, "what did I miss" |
 | `Assistant.kt` | AI button flow: photo + glasses-mic recording, context (time/place), history, text-to-speech |
 | `Llm.kt` | Gemini (google-genai), Claude (Anthropic Java SDK), OpenAI (Responses API), OpenAI-compatible |
 | `Speech.kt` | Tiered speech recognition (on-device, system recognizer, Whisper API fallback) |
@@ -127,6 +156,7 @@ Verified on hardware (DPVR G5, firmware Bluetooth 2.0.2 / camera 1.3.6):
 - Gallery.
 - Firmware check.
 - AI answers from OpenAI with the location context.
+- Reading notifications aloud and the hands-free voice commands.
 
 Not yet verified on hardware:
 - **Delete from glasses after sync** (per-file HTTP delete, `cmd=4003`).

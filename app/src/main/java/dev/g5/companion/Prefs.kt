@@ -71,6 +71,18 @@ class Prefs(context: Context) {
     var wakeWordEnabled: Boolean
         get() = sp.getBoolean("wakeWord", true)
         set(v) = sp.edit().putBoolean("wakeWord", v).apply()
+    /** Speak new phone notifications through the glasses while they're connected. */
+    var readNotifications: Boolean
+        get() = sp.getBoolean("readNotifications", false)
+        set(v) = sp.edit().putBoolean("readNotifications", v).apply()
+    /** Say "Call from <name>" through the glasses when the phone rings. */
+    var announceCalls: Boolean
+        get() = sp.getBoolean("announceCalls", false)
+        set(v) = sp.edit().putBoolean("announceCalls", v).apply()
+    /** "Call Alex" / "text Alex saying …" by voice; needs contacts, phone and SMS permissions. */
+    var voiceCallsTexts: Boolean
+        get() = sp.getBoolean("voiceCallsTexts", false)
+        set(v) = sp.edit().putBoolean("voiceCallsTexts", v).apply()
     var systemPrompt: String
         get() = sp.getString("systemPrompt", null)?.takeIf { it.isNotBlank() } ?: DEFAULT_SYSTEM_PROMPT
         set(v) = sp.edit().putString("systemPrompt", v).apply()

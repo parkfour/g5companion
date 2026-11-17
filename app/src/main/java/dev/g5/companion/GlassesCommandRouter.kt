@@ -195,6 +195,9 @@ class GlassesCommandRouter(
             return CommandResult(false, "No speech recognized", executedLocally = true)
         }
 
+        // 0. Built-in hands-free commands (reply, call, text, timers, walking directions, "what did I miss")
+        if (HandsFree.handle(context, clean)) return CommandResult(true, "Handled hands-free", executedLocally = true)
+
         // 1. Fast-Path Pattern Match: Instant on-device execution (0ms cloud latency)
         val match = ruleStore.findMatchingRule(clean)
         if (match != null) {
